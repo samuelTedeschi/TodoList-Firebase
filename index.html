@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+    <style>
+        .container-login{
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login">
+
+        <h2 class="text-center">Login</h2>
+
+        <form action="" class="login-form mt-5">
+
+            <div class="d-grid col-3 mx-auto mt-4">
+                <label for="" class="form-label">Email:</label>
+                <input type="email" name="email" id="" class="form-control">
+            </div>
+             
+            <div class="d-grid col-3 mx-auto mt-4">
+                <label for="" class="form-label">Senha:</label>
+                <input type="password" name="password" id="" class="form-control">
+            </div>
+            
+            <input type="submit" name="acao" value="Logar" class="btn btn-primary d-grid  col-3 mx-auto mt-4 mb-4">
+        </form>
+
+    </div><!--Login-->
+
+    <div class="container-login">
+        <h1 class="text-center">Bem vindo <a href="javascript:void(0);" class="logout btn btn-outline-danger">Sair</a></h1>
+        
+        <form action="" class="form-cadastra-tarefa">
+            <div class="d-grid col-4 mx-auto mt-4 mb-4">
+                <textarea name="tarefa" id="" rows="4" class="form-control"></textarea>
+            </div>
+            <div class="d-flex col-4 mx-auto mt-4 mb-4">
+                <input type="datetime-local" name="datetime" class="form-control">
+                <input type="submit" value="Cadastrar Tarefa" name="acao" class="btn btn-primary">
+            </div>
+        </form>
+        <hr class="container">
+        <div class="tarefas-usuario d-grid col-4 mx-auto mt-4 mb-4">
+            <h3>Lista de Tarefas:</h3>
+            <ul id="tarefas" class="list-group list-group-flush"></ul>
+        </div>
+    </div><!--Container-login-->
+
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script> 
+
+<script>
+
+  var firebaseConfig = {
+    apiKey: "AIzaSyCFkH4Dhc1y1cJF97zCwr_Z5S3xE5ZJGGs",
+    authDomain: "todolist-ae728.firebaseapp.com",
+    projectId: "todolist-ae728",
+    storageBucket: "todolist-ae728.appspot.com",
+    messagingSenderId: "443492887131",
+    appId: "1:443492887131:web:c3694718effde2a417ed7e"
+  };
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+
+  //começa aqui
+
+  var usuario = null;
+  var formLogin = document.querySelector('form.login-form');
+  var btnLogout = document.querySelector('.logout');
+
+  formLogin.addEventListener('submit',(e)=>{
+    e.preventDefault();
+    let email = document.querySelector('[name=email]').value;
+    let password = document.querySelector('[name=password]').value;
+    //alert(email);
+    //alert(password);
+
+    firebase.auth().signInWithEmailAndPassword(email, password)
+    .then((userCredential) => {
+        // Signed in
+        usuario = userCredential.user;
+        document.querySelector('.login').style.display="none";
+        document.querySelector('.container-login').style.display="block";
+        alert('Logado '+usuario.email);
+
+        formLogin.reset();
+    })
+    .catch((error) => {
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        alert(errorMessage);
+    });
+  });
+
+  const db = firebase.firestore();
+  
+  firebase.auth().onAuthStateChanged((val)=>{
+
+    if(val){
+        usuario = val;
+        alert('Bem-Vindo de volta ' + usuario.email)
+        document.querySelector('.login').style.display="none";
+        document.querySelector('.container-login').style.display="block";
+
+
+        db.collection('tarefas').where("userId","==",usuario.uid).onSnapshot((data)=>{
+            let list = document.querySelector('#tarefas');
+            list.innerHTML = "";
+            
+            let tarefas = data.docs;
+            tarefas = tarefas.sort(function(a,b){
+                if(a.data().horario < b.data().horario)
+                    return -1;
+                else
+                    return +1;
+                
+            })
+
+            tarefas.map((val)=>{
+                list.innerHTML+=`<li class="list-group-item">${val.data().tarefa} <a tarefa-id="${val.id}" class="excluir-btn badge bg-danger rounded-pill link-light mx-5 " href="javascript:void(0)">X</a></li>`
+            })
+
+            var excluiTarefas = document.querySelectorAll('.excluir-btn')
+
+            excluiTarefas.forEach(element => {
+                element.addEventListener('click',function(e){
+                    e.preventDefault();
+                    let docId = element.getAttribute('tarefa-id');
+
+                    db.collection('tarefas').doc(docId).delete();
+                })
+            })
+
+        }) 
+    }
+  })
+
+  
+
+  btnLogout.addEventListener('click',(e)=>{
+    e.preventDefault();
+
+    firebase.auth().signOut().then(() => {
+        // Sign-out successful.
+        usuario = null;
+        document.querySelector('.login').style.display="block";
+        document.querySelector('.container-login').style.display="none";
+        alert('Voce saiu')
+        }).catch((error) => {
+        // An error happened.
+    });
+  });
+  
+
+
+  var formCadastro = document.querySelector('.form-cadastra-tarefa');
+
+
+  formCadastro.addEventListener('submit',(e)=>{
+    e.preventDefault();
+
+    let tarefa = document.querySelector('.form-cadastra-tarefa [name=tarefa]').value;
+    let dateTime = document.querySelector('.form-cadastra-tarefa [name=datetime]').value;
+
+    let dataAtual = new Date().getTime();
+    if(dataAtual > new Date(dateTime).getTime()){
+        alert('data do passado')
+    }else if(tarefa == "" || dateTime == ""){
+        alert("campo vasio ")
+    }else{
+        db.collection('tarefas').add({
+            tarefa: tarefa,
+            horario: new Date(dateTime).getTime(),
+            userId: usuario.uid
+        })
+
+        formCadastro.reset();
+
+        alert("tarefa cadastrada")
+    }
+
+
+  })
+
+</script>
+</body>
+</html>
